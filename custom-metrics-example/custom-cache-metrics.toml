@@ -1,0 +1,67 @@
+# Cache Hit Ratio metrics with inst_id fix for RAC.
+#
+# The built-in cache_hit_ratio metric omits inst_id from the SELECT,
+# causing duplicate metric conflicts on RAC. These metrics replace it
+# with inst_id included, and add a PDB-compatible variant using v$sysmetric.
+#
+# In Grafana, use the following to cover both CDB and PDB:
+#   oracledb_cache_hit_ratio_cdb_value{database=~"$database", cache_hit_type="..."}
+#   or
+#   oracledb_cache_hit_ratio_pdb_value{database=~"$database", cache_hit_type="..."}
+
+# CDB version: uses gv$sysmetric, works on CDB connections (including RAC).
+# Will error silently on PDBs where gv$ access is restricted.
+[[metric]]
+context = "cache_hit_ratio_cdb"
+labels = ["inst_id", "cache_hit_type"]
+metricsdesc = { value = "Cache Hit Ratio (CDB)" }
+request = '''
+select inst_id, metric_name as cache_hit_type, value
+from gv$sysmetric
+where group_id=2 and metric_id in (2000,2050,2112,2110)
+'''
+ignorezeroresult = true
+
+# PDB version: uses v$sysmetric, works on both PDB and CDB connections.
+# inst_id is read from the session context since v$ does not expose it directly.
+[[metric]]
+context = "cache_hit_ratio_pdb"
+labels = ["inst_id", "cache_hit_type"]
+metricsdesc = { value = "Cache Hit Ratio (PDB)" }
+request = '''
+select sys_context('USERENV', 'INSTANCE') as inst_id,
+       metric_name as cache_hit_type,
+       value
+from v$sysmetric
+where group_id=2 and metric_id in (2000,2050,2112,2110)
+'''
+ignorezeroresult = true
+
+
+
+[[metric]]
+context = "cpu_time"
+labels = ["inst_id"]
+metricsdesc = { value = "CPU time used in centiseconds (counter). Use rate() in Grafana." }
+metricstype = { value = "counter" }
+fieldtoappend = "name"
+request = '''
+select inst_id, name, value
+from gv$sysstat
+where name = 'CPU used by this session'
+'''
+ignorezeroresult = true
+
+
+[[metric]]
+context = "cpu_time_model"
+labels = ["inst_id"]
+metricsdesc = { value = "DB CPU time in microseconds (counter, from v$sys_time_model). Use rate()/1e6 in Grafana for CPU seconds/sec." }
+metricstype = { value = "counter" }
+fieldtoappend = "stat_name"
+request = '''
+select inst_id, stat_name, value
+from gv$sys_time_model
+where stat_name = 'DB CPU'
+'''
+ignorezeroresult = true

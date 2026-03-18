@@ -9,6 +9,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
 	_ "github.com/sijms/go-ora/v2"
 	"github.com/sijms/go-ora/v2/network"
 	"log/slog"
@@ -30,14 +32,22 @@ func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) *sql.D
 	}
 	logger.Info(msg, "database", dbname)
 
+	// Set TNS_ADMIN so go-ora can resolve TNS aliases from tnsnames.ora
+	if dbconfig.TNSAdmin != "" {
+		os.Setenv("TNS_ADMIN", dbconfig.TNSAdmin)
+	}
+
 	// Build connection string for go-ora
+	// url.UserPassword properly percent-encodes special characters in credentials,
+	// preventing malformed DSNs when passwords contain @, ?, #, /, % etc.
 	var dsn string
 	if dbconfig.ExternalAuth {
 		// go-ora doesn't directly support external authentication
 		// So we rely on OS authentication (set Oracle wallet/env)
 		dsn = fmt.Sprintf("oracle://@%s", dbconfig.URL)
 	} else if username != "" {
-		dsn = fmt.Sprintf("oracle://%s:%s@%s", username, password, dbconfig.URL)
+		userInfo := url.UserPassword(username, password)
+		dsn = fmt.Sprintf("oracle://%s@%s", userInfo.String(), dbconfig.URL)
 	} else {
 		dsn = fmt.Sprintf("oracle://%s", dbconfig.URL)
 	}

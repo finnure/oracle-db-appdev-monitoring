@@ -36,6 +36,7 @@ type DatabaseConfig struct {
 	Password      string
 	PasswordFile  string `yaml:"passwordFile"`
 	URL           string `yaml:"url"`
+	Disabled      bool   `yaml:"disabled,omitempty"`
 	ConnectConfig `yaml:",inline"`
 	Vault         *VaultConfig      `yaml:"vault,omitempty"`
 	Labels        map[string]string `yaml:"labels,omitempty"`
@@ -393,6 +394,9 @@ func (m *MetricsConfiguration) checkDuplicatedDatabases(logger *slog.Logger) {
 
 	dbs := map[dbkey][]string{}
 	for db, cfg := range m.Databases {
+		if cfg.Disabled {
+			continue
+		}
 		key := dbkey{
 			URL:      cfg.URL,
 			Username: strings.ToLower(cfg.Username),

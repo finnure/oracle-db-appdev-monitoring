@@ -56,6 +56,9 @@ func NewExporter(logger *slog.Logger, m *MetricsConfiguration) *Exporter {
 	// in the same metrics collected from other databases. It will just be
 	// set to a blank value.
 	for _, dbconfig := range m.Databases {
+		if dbconfig.Disabled {
+			continue
+		}
 		for label, _ := range dbconfig.Labels {
 			if !slices.Contains(allConstLabels, label) {
 				allConstLabels = append(allConstLabels, label)
@@ -64,6 +67,10 @@ func NewExporter(logger *slog.Logger, m *MetricsConfiguration) *Exporter {
 	}
 
 	for dbname, dbconfig := range m.Databases {
+		if dbconfig.Disabled {
+			logger.Info("Skipping disabled database", "database", dbname)
+			continue
+		}
 		logger.Info("Initializing database", "database", dbname)
 		database := NewDatabase(logger, m.DatabaseLabel(), dbname, dbconfig)
 		databases = append(databases, database)
