@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	_ "github.com/sijms/go-ora/v2"
 	"github.com/sijms/go-ora/v2/network"
 	"log/slog"
@@ -37,7 +38,10 @@ func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) *sql.D
 		// So we rely on OS authentication (set Oracle wallet/env)
 		dsn = fmt.Sprintf("oracle://@%s", dbconfig.URL)
 	} else if username != "" {
-		dsn = fmt.Sprintf("oracle://%s:%s@%s", username, password, dbconfig.URL)
+		// url.UserPassword properly percent-encodes special characters in credentials,
+		// preventing malformed DSNs when passwords contain @, ?, #, /, % etc.
+		userInfo := url.UserPassword(username, password)
+		dsn = fmt.Sprintf("oracle://%s@%s", userInfo.String(), dbconfig.URL)
 	} else {
 		dsn = fmt.Sprintf("oracle://%s", dbconfig.URL)
 	}
